@@ -1,0 +1,35 @@
+Source: python-munch
+Section: python
+Priority: optional
+Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
+Uploaders:
+ Clint Byrum <spamaps@debian.org>,
+ Thomas Goirand <zigo@debian.org>,
+Build-Depends:
+ debhelper-compat (= 11),
+ dh-python,
+ python3-all,
+ python3-setuptools,
+ python3-six,
+Standards-Version: 4.1.3
+Vcs-Git: https://salsa.debian.org/python-team/modules/python-munch.git
+Vcs-Browser: https://salsa.debian.org/python-team/modules/python-munch
+Homepage: https://github.com/infinidat/munch
+Testsuite: autopkgtest-pkg-python
+
+Package: python3-munch
+Architecture: all
+Multi-Arch: foreign
+Depends:
+ ${misc:Depends},
+ ${python3:Depends},
+Description: dot-accessible dictionary similar to JavaScript objects - Python 3.x
+ Munch is a fork of David Schoonover’s Bunch package, providing similar
+ functionality. 99% of the work was done by him, and the fork was made
+ mainly for lack of responsiveness for fixes and maintenance on the
+ original code.
+ .
+ Munch is a dictionary that supports attribute-style access, a la
+ JavaScript.
+ .
+ This package contains the library prepared for Python 3.x.

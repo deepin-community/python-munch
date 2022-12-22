@@ -1,0 +1,57 @@
+python-munch (2.3.2-2) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Ondřej Nový ]
+  * Use debhelper-compat instead of debian/compat.
+
+  [ Andrey Rahmatullin ]
+  * Drop Python 2 support.
+
+ -- Andrey Rahmatullin <wrar@debian.org>  Thu, 22 Aug 2019 00:29:29 +0500
+
+python-munch (2.3.2-1) unstable; urgency=medium
+
+  [ Ondřej Nový ]
+  * Convert git repository from git-dpm to gbp layout
+
+  [ Clint Byrum ]
+  * New upstream release
+
+ -- Clint Byrum <spamaps@debian.org>  Sun, 06 Jan 2019 07:55:26 -0800
+
+python-munch (2.2.0-2) unstable; urgency=medium
+
+  * Team upload.
+  * d/control:
+    - Enable autopkgtest-pkg-python testsuite (Closes: #890512)
+    - Add python{,3}-six to B-D (Closes: #890527)
+    - Remove python{,3} and python{,3}-six from Depends (not needed)
+  * Bump debhelper compat level to 11
+
+ -- Ondřej Nový <onovy@debian.org>  Thu, 15 Feb 2018 17:35:12 +0100
+
+python-munch (2.2.0-1) unstable; urgency=medium
+
+  [ Clint Byrum ]
+  * Change maintainer to DPMT
+
+  [ Thomas Goirand ]
+  * New upstream release (Closes: #890275).
+  * Added myself as uploaded.
+  * Ran wrap-and-sort -bast.
+  * Changed Priority: from extra to optional as per policy 4.1.0.
+  * Fixed duplicated short descriptions.
+  * Points VCS URLs to Salsa.
+  * Standards-Version is now 4.1.3.
+  * Copyright format URL now using https.
+  * Watch file using https.
+  * Using debhelper 10.
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 12 Feb 2018 21:07:43 +0000
+
+python-munch (2.0.4-1) unstable; urgency=low
+
+  * Initial release. Closes: #804704
+
+ -- Clint Byrum <spamaps@debian.org>  Tue, 10 Nov 2015 10:38:21 -0800
