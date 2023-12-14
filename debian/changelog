@@ -1,3 +1,51 @@
+python-munch (4.0.0-1) unstable; urgency=medium
+
+  [ Ileana Dumitrescu ]
+  * Team upload.
+  * New upstream release.
+  * d/gbp.conf: Pull and commit to pristine-tar branch.
+  * d/control: Bump Standards-Version from 4.1.3 to 4.6.2, set
+    Rules-Requires-Root to no, and add testsuite autopkgtest-pkg-pybuild.
+  * d/tests: Removed, upstream tests run by autopkgtest-pkg-pybuild.
+  * d/watch: Bump version from 3 to 4.
+  * d/upstream/metadata: Add Archive Github.
+  * d/salsa-ci.yml: Enable salsa-ci pipeline.
+
+  [ Jeroen Ploemen ]
+  * Control: remove unused (build-)deps on python3-{pip,pkg-
+    resources,six}; add build-dep on python3-yaml.
+  * Rules: remove override of dh_auto_test; list required files in
+    d/pybuild.testfiles instead.
+
+ -- Ileana Dumitrescu <ileanadumitrescu95@gmail.com>  Wed, 01 Nov 2023 20:38:52 +0000
+
+python-munch (2.5.0-2) unstable; urgency=medium
+
+  * Run unit tests instead of autopkgtest-pkg-python (Closes: #1006850).
+  * Add depends on  python3-pkg-resources and python3-six.
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 08 Mar 2022 09:19:11 +0100
+
+python-munch (2.5.0-1) unstable; urgency=medium
+
+  [ Debian Janitor ]
+  * Bump debhelper from old 11 to 13.
+  * Set upstream metadata fields: Bug-Database, Bug-Submit, Repository,
+    Repository-Browse.
+
+  [ Ondřej Nový ]
+  * d/control: Update Maintainer field with new Debian Python Team
+    contact address.
+  * d/control: Update Vcs-* fields with new Debian Python Team Salsa
+    layout.
+
+  [ Thomas Goirand ]
+  * New upstream release.
+  * Add python3-pbr, python3-pip and python3-pytest as build-depends.
+  * Add override_dh_auto_test.
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 21 Feb 2022 08:53:57 +0100
+
 python-munch (2.3.2-2) unstable; urgency=medium
 
   * Team upload.

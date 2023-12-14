@@ -21,16 +21,28 @@
     converted via Munch.to/fromDict().
 """
 
-__version__ = '2.3.2'
-VERSION = tuple(map(int, __version__.split('.')))
+from collections.abc import Mapping
 
-__all__ = ('Munch', 'munchify', 'DefaultMunch', 'DefaultFactoryMunch', 'unmunchify')
+try:
+    # For python 3.8 and later
+    import importlib.metadata as importlib_metadata
+except ImportError:
+    # For everyone else
+    import importlib_metadata
+try:
+    __version__ = importlib_metadata.version(__name__)
+except importlib_metadata.PackageNotFoundError:
+    # package is not installed
+    __version__ = "0.0.0"
 
 
-from collections import defaultdict
+try:
+    VERSION = tuple(map(int, __version__.split('+')[0].split('.')[:3]))
+except ValueError:
+    VERSION = (0, 0, 0)
 
+__all__ = ('Munch', 'munchify', 'DefaultMunch', 'DefaultFactoryMunch', 'RecursiveMunch', 'unmunchify')
 
-from .python3_compat import *   # pylint: disable=wildcard-import
 
 
 class Munch(dict):
@@ -72,6 +84,8 @@ class Munch(dict):
 
         See unmunchify/Munch.toDict, munchify/Munch.fromDict for notes about conversion.
     """
+    def __init__(self, *args, **kwargs):  # pylint: disable=super-init-not-called
+        self.update(*args, **kwargs)
 
     # only called if k not found in normal places
     def __getattr__(self, k):
@@ -188,10 +202,10 @@ class Munch(dict):
 
             (*) Invertible so long as collection contents are each repr-invertible.
         """
-        return '{0}({1})'.format(self.__class__.__name__, dict.__repr__(self))
+        return f'{self.__class__.__name__}({dict.__repr__(self)})'
 
     def __dir__(self):
-        return list(iterkeys(self))
+        return list(self.keys())
 
     def __getstate__(self):
         """ Implement a serializable interface used for pickling.
@@ -225,15 +239,39 @@ class Munch(dict):
     def copy(self):
         return type(self).fromDict(self)
 
+    def update(self, *args, **kwargs):
+        """
+        Override built-in method to call custom __setitem__ method that may
+        be defined in subclasses.
+        """
+        for k, v in dict(*args, **kwargs).items():
+            self[k] = v
+
+    def get(self, k, d=None):
+        """
+        D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None.
+        """
+        if k not in self:
+            return d
+        return self[k]
+
+    def setdefault(self, k, d=None):
+        """
+        D.setdefault(k[,d]) -> D.get(k,d), also set D[k]=d if k not in D
+        """
+        if k not in self:
+            self[k] = d
+        return self[k]
+
 
 class AutoMunch(Munch):
     def __setattr__(self, k, v):
         """ Works the same as Munch.__setattr__ but if you supply
             a dictionary as value it will convert it to another Munch.
         """
-        if isinstance(v, dict) and not isinstance(v, (AutoMunch, Munch)):
+        if isinstance(v, Mapping) and not isinstance(v, (AutoMunch, Munch)):
             v = munchify(v, AutoMunch)
-        super(AutoMunch, self).__setattr__(k, v)
+        super().__setattr__(k, v)
 
 
 class DefaultMunch(Munch):
@@ -252,13 +290,13 @@ class DefaultMunch(Munch):
             args = args[1:]
         else:
             default = None
-        super(DefaultMunch, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.__default__ = default
 
     def __getattr__(self, k):
         """ Gets key if it exists, otherwise returns the default value."""
         try:
-            return super(DefaultMunch, self).__getattr__(k)
+            return super().__getattr__(k)
         except AttributeError:
             return self.__default__
 
@@ -266,12 +304,12 @@ class DefaultMunch(Munch):
         if k == '__default__':
             object.__setattr__(self, k, v)
         else:
-            return super(DefaultMunch, self).__setattr__(k, v)
+            super().__setattr__(k, v)
 
     def __getitem__(self, k):
         """ Gets key if it exists, otherwise returns the default value."""
         try:
-            return super(DefaultMunch, self).__getitem__(k)
+            return super().__getitem__(k)
         except KeyError:
             return self.__default__
 
@@ -301,11 +339,10 @@ class DefaultMunch(Munch):
         return type(self).fromDict(self, default=self.__default__)
 
     def __repr__(self):
-        return '{0}({1!r}, {2})'.format(
-            type(self).__name__, self.__undefined__, dict.__repr__(self))
+        return f'{type(self).__name__}({self.__undefined__!r}, {dict.__repr__(self)})'
 
 
-class DefaultFactoryMunch(defaultdict, Munch):
+class DefaultFactoryMunch(Munch):
     """ A Munch that calls a user-specified function to generate values for
         missing keys like collections.defaultdict.
 
@@ -320,8 +357,8 @@ class DefaultFactoryMunch(defaultdict, Munch):
     """
 
     def __init__(self, default_factory, *args, **kwargs):
-        # pylint: disable=useless-super-delegation
-        super(DefaultFactoryMunch, self).__init__(default_factory, *args, **kwargs)
+        super().__init__(*args, **kwargs)
+        self.default_factory = default_factory
 
     @classmethod
     def fromDict(cls, d, default_factory):
@@ -333,8 +370,46 @@ class DefaultFactoryMunch(defaultdict, Munch):
 
     def __repr__(self):
         factory = self.default_factory.__name__
-        return '{0}({1}, {2})'.format(
-            type(self).__name__, factory, dict.__repr__(self))
+        return f'{type(self).__name__}({factory}, {dict.__repr__(self)})'
+
+    def __setattr__(self, k, v):
+        if k == 'default_factory':
+            object.__setattr__(self, k, v)
+        else:
+            super().__setattr__(k, v)
+
+    def __missing__(self, k):
+        self[k] = self.default_factory()
+        return self[k]
+
+
+class RecursiveMunch(DefaultFactoryMunch):
+    """A Munch that calls an instance of itself to generate values for
+        missing keys.
+
+        >>> b = RecursiveMunch({'hello': 'world!'})
+        >>> b.hello
+        'world!'
+        >>> b.foo
+        RecursiveMunch(RecursiveMunch, {})
+        >>> b.bar.okay = 'hello'
+        >>> b.bar
+        RecursiveMunch(RecursiveMunch, {'okay': 'hello'})
+        >>> b
+        RecursiveMunch(RecursiveMunch, {'hello': 'world!', 'foo': RecursiveMunch(RecursiveMunch, {}),
+        'bar': RecursiveMunch(RecursiveMunch, {'okay': 'hello'})})
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(RecursiveMunch, *args, **kwargs)
+
+    @classmethod
+    def fromDict(cls, d):
+        # pylint: disable=arguments-differ
+        return munchify(d, factory=cls)
+
+    def copy(self):
+        return type(self).fromDict(self)
 
 
 # While we could convert abstract types like Mapping or Iterable, I think
@@ -363,12 +438,53 @@ def munchify(x, factory=Munch):
 
         nb. As dicts are not hashable, they cannot be nested in sets/frozensets.
     """
-    if isinstance(x, dict):
-        return factory((k, munchify(v, factory)) for k, v in iteritems(x))
-    elif isinstance(x, (list, tuple)):
-        return type(x)(munchify(v, factory) for v in x)
-    else:
-        return x
+    # Munchify x, using `seen` to track object cycles
+    seen = dict()
+
+    def munchify_cycles(obj):
+        partial, already_seen = pre_munchify_cycles(obj)
+        if already_seen:
+            return partial
+        return post_munchify(partial, obj)
+
+    def pre_munchify_cycles(obj):
+        # If we've already begun munchifying obj, just return the already-created munchified obj
+        try:
+            return seen[id(obj)], True
+        except KeyError:
+            pass
+
+        # Otherwise, first partly munchify obj (but without descending into any lists or dicts) and save that
+        seen[id(obj)] = partial = pre_munchify(obj)
+        return partial, False
+
+    def pre_munchify(obj):
+        # Here we return a skeleton of munchified obj, which is enough to save for later (in case
+        # we need to break cycles) but it needs to filled out in post_munchify
+        if isinstance(obj, Mapping):
+            return factory({})
+        elif isinstance(obj, list):
+            return type(obj)()
+        elif isinstance(obj, tuple):
+            type_factory = getattr(obj, "_make", type(obj))
+            return type_factory(pre_munchify_cycles(item)[0] for item in obj)
+        else:
+            return obj
+
+    def post_munchify(partial, obj):
+        # Here we finish munchifying the parts of obj that were deferred by pre_munchify because they
+        # might be involved in a cycle
+        if isinstance(obj, Mapping):
+            partial.update((k, munchify_cycles(obj[k])) for k in obj.keys())
+        elif isinstance(obj, list):
+            partial.extend(munchify_cycles(item) for item in obj)
+        elif isinstance(obj, tuple):
+            for (item_partial, item) in zip(partial, obj):
+                post_munchify(item_partial, item)
+
+        return partial
+
+    return munchify_cycles(x)
 
 
 def unmunchify(x):
@@ -388,12 +504,49 @@ def unmunchify(x):
 
         nb. As dicts are not hashable, they cannot be nested in sets/frozensets.
     """
-    if isinstance(x, dict):
-        return dict((k, unmunchify(v)) for k, v in iteritems(x))
-    elif isinstance(x, (list, tuple)):
-        return type(x)(unmunchify(v) for v in x)
-    else:
-        return x
+
+    # Munchify x, using `seen` to track object cycles
+    seen = dict()
+
+    def unmunchify_cycles(obj):
+        # If we've already begun unmunchifying obj, just return the already-created unmunchified obj
+        try:
+            return seen[id(obj)]
+        except KeyError:
+            pass
+
+        # Otherwise, first partly unmunchify obj (but without descending into any lists or dicts) and save that
+        seen[id(obj)] = partial = pre_unmunchify(obj)
+        # Then finish unmunchifying lists and dicts inside obj (reusing unmunchified obj if cycles are encountered)
+        return post_unmunchify(partial, obj)
+
+    def pre_unmunchify(obj):
+        # Here we return a skeleton of unmunchified obj, which is enough to save for later (in case
+        # we need to break cycles) but it needs to filled out in post_unmunchify
+        if isinstance(obj, Mapping):
+            return dict()
+        elif isinstance(obj, list):
+            return type(obj)()
+        elif isinstance(obj, tuple):
+            type_factory = getattr(obj, "_make", type(obj))
+            return type_factory(unmunchify_cycles(item) for item in obj)
+        else:
+            return obj
+
+    def post_unmunchify(partial, obj):
+        # Here we finish unmunchifying the parts of obj that were deferred by pre_unmunchify because they
+        # might be involved in a cycle
+        if isinstance(obj, Mapping):
+            partial.update((k, unmunchify_cycles(obj[k])) for k in obj.keys())
+        elif isinstance(obj, list):
+            partial.extend(unmunchify_cycles(v) for v in obj)
+        elif isinstance(obj, tuple):
+            for (value_partial, value) in zip(partial, obj):
+                post_unmunchify(value_partial, value)
+
+        return partial
+
+    return unmunchify_cycles(x)
 
 
 # Serialization
@@ -413,7 +566,14 @@ try:
         """
         return json.dumps(self, **options)
 
+    def fromJSON(cls, stream, *args, **kwargs):
+        """ Deserializes JSON to Munch or any of its subclasses.
+        """
+        factory = lambda d: cls(*(args + (d,)), **kwargs)
+        return munchify(json.loads(stream), factory=factory)
+
     Munch.toJSON = toJSON
+    Munch.fromJSON = classmethod(fromJSON)
 
 except ImportError:
     pass
@@ -466,10 +626,15 @@ try:
             >>> yaml.dump(b, default_flow_style=True)
             '!munch.Munch {foo: [bar, !munch.Munch {lol: true}], hello: 42}\\n'
         """
-        return dumper.represent_mapping(u('!munch.Munch'), data)
+        return dumper.represent_mapping('!munch.Munch', data)
 
-    yaml.add_constructor(u('!munch'), from_yaml)
-    yaml.add_constructor(u('!munch.Munch'), from_yaml)
+    for loader_name in ("BaseLoader", "FullLoader", "SafeLoader", "Loader", "UnsafeLoader", "DangerLoader"):
+        LoaderCls = getattr(yaml, loader_name, None)
+        if LoaderCls is None:
+            # This code supports both PyYAML 4.x and 5.x versions
+            continue
+        yaml.add_constructor('!munch', from_yaml, Loader=LoaderCls)
+        yaml.add_constructor('!munch.Munch', from_yaml, Loader=LoaderCls)
 
     SafeRepresenter.add_representer(Munch, to_yaml_safe)
     SafeRepresenter.add_multi_representer(Munch, to_yaml_safe)
@@ -501,11 +666,13 @@ try:
         else:
             return yaml.dump(self, **opts)
 
-    def fromYAML(*args, **kwargs):
-        return munchify(yaml.load(*args, **kwargs))
+    def fromYAML(cls, stream, *args, **kwargs):
+        factory = lambda d: cls(*(args + (d,)), **kwargs)
+        loader_class = kwargs.pop('Loader', yaml.FullLoader)
+        return munchify(yaml.load(stream, Loader=loader_class), factory=factory)
 
     Munch.toYAML = toYAML
-    Munch.fromYAML = staticmethod(fromYAML)
+    Munch.fromYAML = classmethod(fromYAML)
 
 except ImportError:
     pass
